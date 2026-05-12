@@ -3,11 +3,11 @@ name: Backend CD
 on:
   push:
     tags:
-      - "v*"
+      - "backend-v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Git tag to deploy (example: v1.0.0)"
+        description: "Git tag to deploy (example: backend-v1.0.0)"
         required: true
         type: string
 
@@ -19,7 +19,7 @@ jobs:
   publish-image:
     name: Publish Backend Image
     runs-on: ubuntu-latest
-    environment: production
+    environment: backend-production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
