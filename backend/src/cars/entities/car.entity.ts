@@ -78,8 +78,3 @@ export class Car {
 export const CarSchema = SchemaFactory.createForClass(Car);
 
 CarSchema.index({ vin: 1 }, { unique: true, name: 'uniq_vin' });
-CarSchema.index({ dealershipId: 1 }, { name: 'idx_dealership_id' });
-CarSchema.index(
-  { status: 1, updatedAt: -1 },
-  { name: 'idx_status_updated_at' },
-);
