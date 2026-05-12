@@ -114,10 +114,10 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ### CD behavior
 
-- CD triggers on Git tags matching `v*` and can also run manually.
+- CD triggers on Git tags matching `backend-v*` and can also run manually.
 - The tag commit must be contained in `main`.
-- The job publishes a Docker image to GHCR and uses GitHub `production` environment.
+- The job publishes a Docker image to GHCR and uses GitHub `backend-production` environment.
 
 ### Environment setup
 
-- GitHub: create Environment `production` and add environment secrets as needed when deployment steps are introduced later.
+- GitHub: create Environment `backend-production` and add environment secrets as needed when deployment steps are introduced later.
