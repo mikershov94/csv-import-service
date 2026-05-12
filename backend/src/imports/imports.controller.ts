@@ -5,6 +5,7 @@ import {
     MessageEvent,
     Param,
     Post,
+    Query,
     Sse,
     UploadedFile,
     UseInterceptors,
@@ -13,9 +14,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
 
 import { CreateImportResponseDto } from './dto/create-import-response.dto';
-import { ImportSummaryDto } from './dto/import-summary.dto';
+import { GetImportsQueryDto } from './dto/get-imports-query.dto';
+import { ImportDetailsDto } from './dto/import-details.dto';
 import { RecentImportsResponseDto } from './dto/recent-imports-response.dto';
 import { ImportsService } from './imports.service';
+import { ParseMongoIdPipe } from './pipes/parse-mongo-id.pipe';
 
 @Controller('imports')
 export class ImportsController {
@@ -23,7 +26,7 @@ export class ImportsController {
 
     @Post()
     @UseInterceptors(FileInterceptor('file'))
-    createImport(@UploadedFile() file?: Express.Multer.File): CreateImportResponseDto {
+    createImport(@UploadedFile() file?: Express.Multer.File): Promise<CreateImportResponseDto> {
         if (!file) {
             throw new BadRequestException('file is required');
         }
@@ -32,17 +35,17 @@ export class ImportsController {
     }
 
     @Sse(':jobId/events')
-    streamImportEvents(@Param('jobId') jobId: string): Observable<MessageEvent> {
+    streamImportEvents(@Param('jobId', ParseMongoIdPipe) jobId: string): Observable<MessageEvent> {
         return this.importsService.streamImportEvents(jobId);
     }
 
     @Get(':jobId')
-    getImportById(@Param('jobId') jobId: string): ImportSummaryDto {
+    getImportById(@Param('jobId', ParseMongoIdPipe) jobId: string): Promise<ImportDetailsDto> {
         return this.importsService.getImportById(jobId);
     }
 
     @Get()
-    getRecentImports(): RecentImportsResponseDto {
-        return this.importsService.getRecentImports();
+    getRecentImports(@Query() query: GetImportsQueryDto): Promise<RecentImportsResponseDto> {
+        return this.importsService.getRecentImports(query);
     }
 }
