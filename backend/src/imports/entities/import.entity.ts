@@ -21,8 +21,9 @@ export class ImportErrorSummaryItem {
   count!: number;
 }
 
-export const ImportErrorSummaryItemSchema =
-  SchemaFactory.createForClass(ImportErrorSummaryItem);
+export const ImportErrorSummaryItemSchema = SchemaFactory.createForClass(
+  ImportErrorSummaryItem,
+);
 
 export type ImportDocument = HydratedDocument<Import>;
 
