@@ -66,6 +66,10 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^@shared$": "<rootDir>/../../shared/src/index.ts",
+      "^@shared/(.*)$": "<rootDir>/../../shared/src/$1"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

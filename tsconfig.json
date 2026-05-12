@@ -1,0 +1,15 @@
+{
+    "files": [],
+    "references": [
+        { "path": "./backend" },
+        { "path": "./worker" }
+    ],
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@shared": ["shared/src/index.ts"],
+            "@shared/*": ["shared/src/*"]
+        }
+    },
+    "include": ["shared/src/**/*.ts"]
+}
