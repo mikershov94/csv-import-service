@@ -61,7 +61,11 @@ export class ImportsService {
             filter.status = query.status;
         }
 
-        const foundImports = await this.importModel.find(filter).sort({ createdAt: -1 }).limit(limit).exec();
+        const foundImports = await this.importModel
+            .find(filter)
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .exec();
 
         return { items: foundImports.map((item) => this.mapImportToListItemDto(item)) };
     }
@@ -100,7 +104,9 @@ export class ImportsService {
             failedRows: importEntity.failedRows,
             insertedCount: importEntity.insertedCount,
             updatedCount: importEntity.updatedCount,
-            topErrors: importEntity.errorSummary.map((item) => this.mapImportToErrorSummaryItemDto(item)),
+            topErrors: importEntity.errorSummary.map((item) =>
+                this.mapImportToErrorSummaryItemDto(item),
+            ),
             startedAt: importEntity.startedAt?.toISOString(),
             finishedAt: importEntity.finishedAt?.toISOString(),
             createdAt: this.getCreatedAt(importEntity).toISOString(),
