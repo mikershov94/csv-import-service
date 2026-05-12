@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     Controller,
     Get,
     MessageEvent,
@@ -18,6 +17,7 @@ import { GetImportsQueryDto } from './dto/get-imports-query.dto';
 import { ImportDetailsDto } from './dto/import-details.dto';
 import { RecentImportsResponseDto } from './dto/recent-imports-response.dto';
 import { ImportsService } from './imports.service';
+import { CsvFileValidationPipe } from './pipes/csv-file-validation.pipe';
 import { ParseMongoIdPipe } from './pipes/parse-mongo-id.pipe';
 
 @Controller('imports')
@@ -26,16 +26,17 @@ export class ImportsController {
 
     @Post()
     @UseInterceptors(FileInterceptor('file'))
-    createImport(@UploadedFile() file?: Express.Multer.File): Promise<CreateImportResponseDto> {
-        if (!file) {
-            throw new BadRequestException('file is required');
-        }
-
+    createImport(
+        @UploadedFile(CsvFileValidationPipe) file: Express.Multer.File,
+    ): Promise<CreateImportResponseDto> {
         return this.importsService.createImportJob(file);
     }
 
     @Sse(':jobId/events')
-    streamImportEvents(@Param('jobId', ParseMongoIdPipe) jobId: string): Observable<MessageEvent> {
+    async streamImportEvents(
+        @Param('jobId', ParseMongoIdPipe) jobId: string,
+    ): Promise<Observable<MessageEvent>> {
+        await this.importsService.ensureImportExists(jobId);
         return this.importsService.streamImportEvents(jobId);
     }
 
