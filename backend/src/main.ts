@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+    app.setGlobalPrefix('api');
     const port = Number.parseInt(process.env.PORT ?? '8000', 10);
     await app.listen(Number.isNaN(port) ? 8000 : port);
 }
