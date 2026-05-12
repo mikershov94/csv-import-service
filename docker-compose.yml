@@ -1,4 +1,13 @@
 services:
+  mongodb:
+    image: mongo:8
+    env_file:
+      - ./backend/.env
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
   backend:
     build:
       context: ./backend
@@ -7,6 +16,8 @@ services:
       - ./backend/.env
     ports:
       - "8000:8000"
+    depends_on:
+      - mongodb
 
   frontend:
     build:
@@ -18,3 +29,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+
+volumes:
+  mongo_data:
