@@ -33,6 +33,21 @@ services:
       - mongodb
       - rabbitmq
 
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8000
+      NODE_ENV: production
+      MONGODB_URI: ${MONGODB_URI}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    ports:
+      - "8080:8000"
+    depends_on:
+      - mongodb
+      - rabbitmq
+
   frontend:
     build:
       context: ./frontend
