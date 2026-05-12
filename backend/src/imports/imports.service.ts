@@ -16,6 +16,13 @@ import { Import, ImportDocument, ImportStatus } from './entities/import.entity';
 export class ImportsService {
     constructor(@InjectModel(Import.name) private readonly importModel: Model<ImportDocument>) {}
 
+    async ensureImportExists(jobId: string): Promise<void> {
+        const existingImport = await this.importModel.exists({ _id: jobId });
+        if (!existingImport) {
+            throw new NotFoundException(`Задача импорта ${jobId} не найдена`);
+        }
+    }
+
     async createImportJob(file: Express.Multer.File): Promise<CreateImportResponseDto> {
         const createdImport = await this.importModel.create({
             status: ImportStatus.QUEUED,
@@ -48,7 +55,7 @@ export class ImportsService {
     async getImportById(jobId: string): Promise<ImportDetailsDto> {
         const foundImport = await this.importModel.findById(jobId).exec();
         if (!foundImport) {
-            throw new NotFoundException(`Import job ${jobId} not found`);
+            throw new NotFoundException(`Задача импорта ${jobId} не найдена`);
         }
 
         return this.mapImportToDetailsDto(foundImport);
