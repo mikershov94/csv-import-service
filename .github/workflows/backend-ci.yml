@@ -91,6 +91,6 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Build Docker image (smoke check)
+      - name: Build Docker image
         run: docker build -f backend/Dockerfile -t backend-ci:${{ github.sha }} backend
         working-directory: .
