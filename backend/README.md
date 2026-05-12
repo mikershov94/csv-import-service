@@ -96,3 +96,28 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## CI/CD notes for this repository
+
+- Backend CI workflow: `.github/workflows/backend-ci.yml`
+- Backend CD workflow: `.github/workflows/backend-cd.yml`
+- Docker image: `ghcr.io/<owner>/csv-import-service-backend`
+
+### Required scripts
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run format:check`
+- `npm run test`
+- `npm run test:e2e`
+- `npm run build`
+
+### CD behavior
+
+- CD triggers on Git tags matching `v*` and can also run manually.
+- The tag commit must be contained in `main`.
+- The job publishes a Docker image to GHCR and uses GitHub `production` environment.
+
+### Environment setup
+
+- GitHub: create Environment `production` and add environment secrets as needed when deployment steps are introduced later.

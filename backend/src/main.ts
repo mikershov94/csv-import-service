@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  const port = Number.parseInt(process.env.PORT ?? '3000', 10);
+  await app.listen(Number.isNaN(port) ? 3000 : port);
 }
-bootstrap();
+void bootstrap();
