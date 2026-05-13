@@ -1,0 +1,16 @@
+{
+  "name": "csv-import-service-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "gen:csv:happy": "node scripts/generate-import-csv.js --mode happy --rows 100 --out ./test/artifacts/happy.csv",
+    "gen:csv:mixed": "node scripts/generate-import-csv.js --mode mixed --rows 100 --invalid-rate 0.2 --out ./test/artifacts/mixed.csv",
+    "gen:csv:scale": "node scripts/generate-import-csv.js --mode happy --rows 10000 --out ./test/artifacts/pipeline-scaled-happy.csv",
+    "gen:sample": "node scripts/generate-import-csv.js --mode sample --out ./sample.csv",
+    "test:e2e:pipeline": "npx --prefix backend jest --config ./test/jest-pipeline.config.json --runInBand"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "mongodb": "^6.20.0"
+  }
+}
