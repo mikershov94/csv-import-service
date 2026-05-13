@@ -1,3 +1,5 @@
+import { FileDropzone } from "@/shared/ui";
+
 export const UploadZoneWidget = () => {
-  return <section className="min-h-44 rounded-2xl bg-rose-300" />;
+  return <FileDropzone inputId="upload-zone-input" className="bg-rose-300" />;
 };

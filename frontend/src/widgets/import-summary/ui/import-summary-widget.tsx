@@ -1,3 +1,5 @@
+import { Panel } from "@/shared/ui";
+
 export const ImportSummaryWidget = () => {
-  return <section className="min-h-44 rounded-2xl bg-emerald-300" />;
+  return <Panel className="min-h-44 bg-emerald-300" />;
 };

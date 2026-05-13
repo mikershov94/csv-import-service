@@ -1,3 +1,5 @@
+import { Panel } from "@/shared/ui";
+
 export const ImportHistoryWidget = () => {
-  return <section className="min-h-56 rounded-2xl bg-sky-300" />;
+  return <Panel className="min-h-56 bg-sky-300" />;
 };

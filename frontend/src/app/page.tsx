@@ -1,4 +1,4 @@
-import { PageContainer } from "@/shared/ui/page-container/page-container";
+import { PageContainer } from "@/shared/ui";
 import { ImportHistoryWidget } from "@/widgets/import-history/ui/import-history-widget";
 import { ImportProgressWidget } from "@/widgets/import-progress/ui/import-progress-widget";
 import { ImportSummaryWidget } from "@/widgets/import-summary/ui/import-summary-widget";
