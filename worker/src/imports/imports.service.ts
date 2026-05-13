@@ -67,6 +67,23 @@ export class ImportsService {
         return { status, finishedAt };
     }
 
+    async hasErrors(jobId: string): Promise<boolean> {
+        const importEntity = await this.importModel
+            .findById(jobId)
+            .select({ failedRows: 1, errorSummary: 1 })
+            .lean()
+            .exec();
+
+        if (!importEntity) {
+            return false;
+        }
+
+        const failedRows = importEntity.failedRows ?? 0;
+        const errorsCount = importEntity.errorSummary?.length ?? 0;
+
+        return failedRows > 0 || errorsCount > 0;
+    }
+
     async markFailed(jobId: string, message: string, code = 'WORKER_ERROR'): Promise<void> {
         const importEntity = await this.importModel.findById(jobId).exec();
         if (!importEntity) {

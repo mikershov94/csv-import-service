@@ -14,7 +14,11 @@ import { CarsService } from '../../cars/cars.service';
 import { CarUpsertInput } from '../../cars/interfaces/cars.interfaces';
 import { ImportsService } from '../imports.service';
 import { IMPORT_QUEUE_NAME, resolveQueueConsumerPrefetch } from './import-queue-consumer.consts';
-import { parseImportQueueEvent } from './typeguards';
+import {
+    extractJobIdFromPayload,
+    InvalidQueueEventPayloadError,
+    parseImportQueueEvent,
+} from './typeguards';
 import { parseImportRow } from './utils/parse-import-row.util';
 
 @Injectable()
@@ -66,14 +70,29 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
             return;
         }
 
+        const rawPayload = message.content.toString('utf8');
+        let parsedEvent: ImportQueueEvent | undefined;
+
         try {
-            const event = this.parseEvent(message.content.toString('utf8'));
+            const event = this.parseEvent(rawPayload);
+            parsedEvent = event;
             await this.processEvent(event);
             this.channel.ack(message);
         } catch (error) {
             const messageText = error instanceof Error ? error.message : 'unknown error';
             this.logger.error(`Ошибка обработки сообщения очереди: ${messageText}`);
-            this.channel.nack(message, false, true);
+
+            const retryable = this.isRetryableError(error);
+            if (retryable) {
+                this.channel.nack(message, false, true);
+                return;
+            }
+
+            const jobId = parsedEvent?.jobId ?? extractJobIdFromPayload(rawPayload);
+            if (jobId) {
+                await this.markImportFailedSafely(jobId, messageText, 'WORKER_FATAL_ERROR');
+            }
+            this.channel.nack(message, false, false);
         }
     }
 
@@ -159,6 +178,24 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
     }
 
     private async handleStreamEnd(event: ImportStreamEndEvent): Promise<void> {
-        await this.importsService.markCompleted(event.jobId, false);
+        const hasErrors = await this.importsService.hasErrors(event.jobId);
+        await this.importsService.markCompleted(event.jobId, hasErrors);
+    }
+
+    private isRetryableError(error: unknown): boolean {
+        return !(error instanceof InvalidQueueEventPayloadError);
+    }
+
+    private async markImportFailedSafely(
+        jobId: string,
+        message: string,
+        code: string,
+    ): Promise<void> {
+        try {
+            await this.importsService.markFailed(jobId, message, code);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'unknown error';
+            this.logger.error(`Не удалось обновить import ${jobId} в failed: ${errorMessage}`);
+        }
     }
 }
