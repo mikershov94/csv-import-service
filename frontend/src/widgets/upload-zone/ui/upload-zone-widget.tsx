@@ -2,13 +2,13 @@ import { UploadCsvForm } from '@/features/upload-csv';
 import { Panel } from '@/shared/ui';
 
 type UploadZoneWidgetProps = {
-  onStartImport?: (file: File) => void;
+  onImportCreated?: (jobId: string) => void;
 };
 
-export const UploadZoneWidget = ({ onStartImport }: UploadZoneWidgetProps) => {
+export const UploadZoneWidget = ({ onImportCreated }: UploadZoneWidgetProps) => {
   return (
     <Panel className="bg-rose-300">
-      <UploadCsvForm onStartImport={onStartImport} />
+      <UploadCsvForm onImportCreated={onImportCreated} />
     </Panel>
   );
 };
