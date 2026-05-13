@@ -128,6 +128,12 @@ describe('Imports RabbitMQ integration (e2e)', () => {
     });
 
     afterEach(async () => {
+        if (importModel) {
+            await importModel.deleteMany({});
+        }
+        if (queueChannel) {
+            await queueChannel.purgeQueue(IMPORT_QUEUE_NAME);
+        }
         if (app) {
             await app.close();
         }
