@@ -94,7 +94,7 @@ export class ImportsService {
     private async publishImportFile(jobId: string, file: Express.Multer.File): Promise<void> {
         const chunkSize = resolveImportChunkSize();
         await this.importQueuePublisher.publishJobStart(jobId, file.originalname, file.size);
-        const source = Readable.from(file.buffer);
+        const source = Readable.from([file.buffer]);
         const lineReader = createInterface({ input: source, crlfDelay: Infinity });
 
         let isHeaderSkipped = false;
