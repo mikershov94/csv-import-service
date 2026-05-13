@@ -1,7 +1,8 @@
 import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Observable, of } from 'rxjs';
+import { Observable, timer } from 'rxjs';
+import { distinctUntilChanged, map, switchMap, takeWhile } from 'rxjs/operators';
 
 import { resolveImportChunkSize } from './consts/import-queue.consts';
 import { CreateImportResponseDto } from './dto/create-import-response.dto';
@@ -15,6 +16,8 @@ import { ImportQueuePublisher } from './queue/import-queue.publisher';
 
 @Injectable()
 export class ImportsService {
+    private static readonly IMPORT_PROGRESS_POLL_INTERVAL_MS = 500;
+
     constructor(
         @InjectModel(Import.name) private readonly importModel: Model<ImportDocument>,
         private readonly importQueuePublisher: ImportQueuePublisher,
@@ -49,18 +52,13 @@ export class ImportsService {
     }
 
     streamImportEvents(jobId: string): Observable<MessageEvent> {
-        const data: ImportProgressEventDto = {
-            jobId,
-            status: ImportStatus.QUEUED,
-            processedBytes: 0,
-            validRows: 0,
-            invalidRows: 0,
-        };
-
-        return of({
-            type: 'progress',
-            data,
-        });
+        return timer(0, ImportsService.IMPORT_PROGRESS_POLL_INTERVAL_MS).pipe(
+            switchMap(async () => this.importModel.findById(jobId).lean().exec()),
+            map((importEntity) => this.mapImportToProgressData(jobId, importEntity)),
+            distinctUntilChanged((previous, next) => this.isSameProgress(previous, next)),
+            takeWhile((event) => !this.isFinalImportStatus(event.status), true),
+            map((data) => ({ type: 'progress', data })),
+        );
     }
 
     async getImportById(jobId: string): Promise<ImportDetailsDto> {
@@ -150,5 +148,57 @@ export class ImportsService {
                 },
             )
             .exec();
+    }
+
+    private mapImportToProgressData(
+        jobId: string,
+        importEntity: {
+            status?: ImportStatus;
+            processedRows?: number;
+            successRows?: number;
+            failedRows?: number;
+            totalRows?: number;
+            fileSizeBytes?: number;
+        } | null,
+    ): ImportProgressEventDto {
+        const status = importEntity?.status ?? ImportStatus.QUEUED;
+        const validRows = importEntity?.successRows ?? 0;
+        const invalidRows = importEntity?.failedRows ?? 0;
+        const processedRows = importEntity?.processedRows ?? 0;
+        const totalRows = importEntity?.totalRows ?? 0;
+        const fileSizeBytes = importEntity?.fileSizeBytes ?? 0;
+        const processedBytes =
+            totalRows > 0
+                ? Math.min(fileSizeBytes, Math.floor((processedRows / totalRows) * fileSizeBytes))
+                : 0;
+
+        return {
+            jobId,
+            status,
+            processedBytes,
+            validRows,
+            invalidRows,
+        };
+    }
+
+    private isFinalImportStatus(status: ImportStatus): boolean {
+        return (
+            status === ImportStatus.COMPLETED ||
+            status === ImportStatus.COMPLETED_WITH_ERRORS ||
+            status === ImportStatus.FAILED
+        );
+    }
+
+    private isSameProgress(
+        previous: ImportProgressEventDto,
+        next: ImportProgressEventDto,
+    ): boolean {
+        return (
+            previous.jobId === next.jobId &&
+            previous.status === next.status &&
+            previous.processedBytes === next.processedBytes &&
+            previous.validRows === next.validRows &&
+            previous.invalidRows === next.invalidRows
+        );
     }
 }

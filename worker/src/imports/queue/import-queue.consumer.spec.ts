@@ -55,6 +55,7 @@ describe('ImportQueueConsumer', () => {
             markCompleted: jest.fn(),
             markFailed: jest.fn(),
             markProcessing: jest.fn(),
+            setTotalRows: jest.fn(),
         } as unknown as jest.Mocked<ImportsService>;
 
         carsService = {
@@ -126,6 +127,10 @@ describe('ImportQueueConsumer', () => {
             jobId: 'job-3',
         });
 
+        expect(importsService.setTotalRows).toHaveBeenCalledWith(
+            'job-3',
+            STREAM_END_BASE_EVENT.totalRows,
+        );
         expect(importsService.hasErrors).toHaveBeenCalledWith('job-3');
         expect(importsService.markCompleted).toHaveBeenCalledWith('job-3', true);
     });

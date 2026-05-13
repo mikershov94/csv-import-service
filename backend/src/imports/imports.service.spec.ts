@@ -132,6 +132,11 @@ describe('ImportsService', () => {
 
     it('возвращает стартовое SSE-событие прогресса для job', async () => {
         const jobId = new Types.ObjectId().toString();
+        importModel.findById.mockReturnValue({
+            lean: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(null),
+            }),
+        });
 
         const event = await firstValueFrom(service.streamImportEvents(jobId));
 
