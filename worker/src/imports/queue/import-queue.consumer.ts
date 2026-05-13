@@ -3,15 +3,19 @@ import {
     assertNever,
     IMPORT_QUEUE_EVENTS,
     ImportChunkEvent,
+    ImportErrorSummaryItem,
     ImportJobStartEvent,
     ImportQueueEvent,
     ImportStreamEndEvent,
 } from '@shared';
 import { Channel, ChannelModel, connect, ConsumeMessage } from 'amqplib';
 
+import { CarsService } from '../../cars/cars.service';
+import { CarUpsertInput } from '../../cars/interfaces/cars.interfaces';
 import { ImportsService } from '../imports.service';
 import { IMPORT_QUEUE_NAME, resolveQueueConsumerPrefetch } from './import-queue-consumer.consts';
 import { parseImportQueueEvent } from './typeguards';
+import { parseImportRow } from './utils/parse-import-row.util';
 
 @Injectable()
 export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
@@ -21,7 +25,10 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
     private channel?: Channel;
     private consumerTag?: string;
 
-    constructor(private readonly importsService: ImportsService) {}
+    constructor(
+        private readonly importsService: ImportsService,
+        private readonly carsService: CarsService,
+    ) {}
 
     async onModuleInit(): Promise<void> {
         const rabbitUrl = process.env.RABBITMQ_URL;
@@ -96,13 +103,59 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
 
     private async handleChunk(event: ImportChunkEvent): Promise<void> {
         const rowsCount = event.rowsCount ?? event.rows.length;
-        await this.importsService.applyProgress(event.jobId, {
-            processedRows: rowsCount,
-            successRows: rowsCount,
-            failedRows: 0,
-            insertedCount: 0,
-            updatedCount: 0,
-        });
+        const validCars: CarUpsertInput[] = [];
+        const errorItems: ImportErrorSummaryItem[] = [];
+
+        for (const row of event.rows) {
+            const result = parseImportRow(row);
+            if (result.ok) {
+                validCars.push(result.car);
+                continue;
+            }
+            errorItems.push(result.error);
+        }
+
+        const invalidRowsCount = rowsCount - validCars.length;
+        if (validCars.length === 0) {
+            await this.importsService.applyProgress(event.jobId, {
+                processedRows: rowsCount,
+                successRows: 0,
+                failedRows: invalidRowsCount,
+                insertedCount: 0,
+                updatedCount: 0,
+                errorItems,
+            });
+            return;
+        }
+
+        try {
+            const upsertResult = await this.carsService.bulkUpsertCars(validCars);
+            await this.importsService.applyProgress(event.jobId, {
+                processedRows: rowsCount,
+                successRows: upsertResult.processedCount,
+                failedRows: invalidRowsCount,
+                insertedCount: upsertResult.insertedCount,
+                updatedCount: upsertResult.updatedCount,
+                errorItems,
+            });
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : 'Ошибка при записи автомобилей';
+            errorItems.push({
+                code: 'CARS_BULK_UPSERT_FAILED',
+                message,
+                count: validCars.length,
+            });
+
+            await this.importsService.applyProgress(event.jobId, {
+                processedRows: rowsCount,
+                successRows: 0,
+                failedRows: rowsCount,
+                insertedCount: 0,
+                updatedCount: 0,
+                errorItems,
+            });
+        }
     }
 
     private async handleStreamEnd(event: ImportStreamEndEvent): Promise<void> {
