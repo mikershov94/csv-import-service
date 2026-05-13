@@ -6,14 +6,26 @@ import {
     ImportJobStartEvent,
     ImportStreamEndEvent,
 } from '@shared';
-import { Channel, ChannelModel, connect } from 'amqplib';
+import { ChannelModel, ConfirmChannel, connect } from 'amqplib';
 
 const IMPORT_QUEUE_NAME = 'imports.queue';
+const DEFAULT_PUBLISH_RETRIES = 3;
+const DEFAULT_PUBLISH_TIMEOUT_MS = 5000;
+
+export class QueuePublishError extends Error {
+    constructor(
+        message: string,
+        public readonly retryable: boolean,
+    ) {
+        super(message);
+        this.name = 'QueuePublishError';
+    }
+}
 
 @Injectable()
 export class ImportQueuePublisher implements OnModuleDestroy {
     private connection?: ChannelModel;
-    private channel?: Channel;
+    private channel?: ConfirmChannel;
 
     async publishJobStart(jobId: string, fileName: string, fileSizeBytes: number): Promise<void> {
         const event: ImportJobStartEvent = {
@@ -38,39 +50,66 @@ export class ImportQueuePublisher implements OnModuleDestroy {
             jobId,
             chunkIndex,
             isLast,
+            rowsCount: rows.length,
             rows,
         };
         await this.publish(event);
     }
 
-    async publishStreamEnd(jobId: string, totalChunks: number): Promise<void> {
+    async publishStreamEnd(jobId: string, totalChunks: number, totalRows: number): Promise<void> {
         const event: ImportStreamEndEvent = {
             version: IMPORT_QUEUE_EVENT_VERSION,
             type: IMPORT_QUEUE_EVENTS.STREAM_END,
             jobId,
             totalChunks,
+            totalRows,
         };
         await this.publish(event);
     }
 
     async onModuleDestroy(): Promise<void> {
-        await this.channel?.close();
-        await this.connection?.close();
+        await this.closeConnections();
     }
 
     private async publish(payload: object): Promise<void> {
-        const channel = await this.getOrCreateChannel();
-        const sent = channel.sendToQueue(IMPORT_QUEUE_NAME, Buffer.from(JSON.stringify(payload)), {
-            persistent: true,
-            contentType: 'application/json',
-        });
+        let attempt = 0;
+        let lastError: unknown;
 
-        if (!sent) {
-            throw new Error('RabbitMQ временно не принимает сообщения');
+        while (attempt < DEFAULT_PUBLISH_RETRIES) {
+            try {
+                const channel = await this.getOrCreateChannel();
+                const sent = channel.sendToQueue(
+                    IMPORT_QUEUE_NAME,
+                    Buffer.from(JSON.stringify(payload)),
+                    {
+                        persistent: true,
+                        contentType: 'application/json',
+                    },
+                );
+
+                if (!sent) {
+                    throw new QueuePublishError('RabbitMQ временно не принимает сообщения', true);
+                }
+
+                await this.waitForConfirms(channel);
+                return;
+            } catch (error) {
+                lastError = error;
+                attempt += 1;
+                await this.closeConnections();
+
+                if (attempt >= DEFAULT_PUBLISH_RETRIES || !this.isRetryableError(error)) {
+                    break;
+                }
+
+                await this.delay(attempt * 100);
+            }
         }
+
+        throw this.toQueuePublishError(lastError);
     }
 
-    private async getOrCreateChannel(): Promise<Channel> {
+    private async getOrCreateChannel(): Promise<ConfirmChannel> {
         if (this.channel) {
             return this.channel;
         }
@@ -81,9 +120,56 @@ export class ImportQueuePublisher implements OnModuleDestroy {
         }
 
         this.connection = await connect(rabbitUrl);
-        this.channel = await this.connection.createChannel();
+        this.channel = await this.connection.createConfirmChannel();
         await this.channel.assertQueue(IMPORT_QUEUE_NAME, { durable: true });
 
         return this.channel;
+    }
+
+    private async waitForConfirms(channel: ConfirmChannel): Promise<void> {
+        let timeoutId: NodeJS.Timeout | undefined;
+        try {
+            await Promise.race([
+                channel.waitForConfirms(),
+                new Promise<never>((_, reject) => {
+                    timeoutId = setTimeout(
+                        () => reject(new QueuePublishError('Publish timeout', true)),
+                        DEFAULT_PUBLISH_TIMEOUT_MS,
+                    );
+                }),
+            ]);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        }
+    }
+
+    private isRetryableError(error: unknown): boolean {
+        if (error instanceof QueuePublishError) {
+            return error.retryable;
+        }
+        return true;
+    }
+
+    private toQueuePublishError(error: unknown): QueuePublishError {
+        if (error instanceof QueuePublishError) {
+            return error;
+        }
+        if (error instanceof Error) {
+            return new QueuePublishError(error.message, false);
+        }
+        return new QueuePublishError('Ошибка публикации в очередь', false);
+    }
+
+    private async delay(ms: number): Promise<void> {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    private async closeConnections(): Promise<void> {
+        await this.channel?.close();
+        await this.connection?.close();
+        this.channel = undefined;
+        this.connection = undefined;
     }
 }

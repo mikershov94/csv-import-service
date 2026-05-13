@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ImportChunkEvent, ImportQueueEvent, ImportStreamEndEvent } from '@shared';
 import { Channel, ChannelModel, connect } from 'amqplib';
 import { Model } from 'mongoose';
 import request from 'supertest';
@@ -10,6 +11,7 @@ import { App } from 'supertest/types';
 import { Import, ImportDocument, ImportStatus } from '../src/imports/entities/import.entity';
 import { ImportsModule } from '../src/imports/imports.module';
 
+const HEADER = 'vin,make,model,year,mileage,dealershipId,status';
 const TEST_MONGO_URI =
     process.env.TEST_MONGODB_URI ??
     'mongodb://admin:Asdqwe123%21@localhost:27017/csv_import_service?authSource=admin';
@@ -41,14 +43,47 @@ describe('Imports RabbitMQ integration (e2e)', () => {
         );
         await app.init();
 
-        importModel = app.get(getModelToken(Import.name));
+        importModel = app.get<Model<ImportDocument>>(getModelToken(Import.name));
     }
 
-    async function collectQueueMessages(
-        timeoutMs: number,
-    ): Promise<Array<Record<string, unknown>>> {
+    function isRecord(value: unknown): value is Record<string, unknown> {
+        return typeof value === 'object' && value !== null;
+    }
+
+    function isImportQueueEvent(value: unknown): value is ImportQueueEvent {
+        if (!isRecord(value) || typeof value.type !== 'string' || typeof value.jobId !== 'string') {
+            return false;
+        }
+
+        if (value.type === 'import.job.start') {
+            return typeof value.fileName === 'string' && typeof value.fileSizeBytes === 'number';
+        }
+        if (value.type === 'import.chunk') {
+            return (
+                typeof value.chunkIndex === 'number' &&
+                typeof value.isLast === 'boolean' &&
+                typeof value.rowsCount === 'number' &&
+                Array.isArray(value.rows)
+            );
+        }
+        if (value.type === 'import.stream.end') {
+            return typeof value.totalChunks === 'number' && typeof value.totalRows === 'number';
+        }
+
+        return false;
+    }
+
+    function parseQueueEvent(payload: string): ImportQueueEvent {
+        const parsed: unknown = JSON.parse(payload);
+        if (!isImportQueueEvent(parsed)) {
+            throw new Error('Unexpected queue event payload');
+        }
+        return parsed;
+    }
+
+    async function collectQueueMessages(timeoutMs: number): Promise<ImportQueueEvent[]> {
         const startedAt = Date.now();
-        const events: Array<Record<string, unknown>> = [];
+        const events: ImportQueueEvent[] = [];
 
         while (Date.now() - startedAt < timeoutMs) {
             const message = await queueChannel.get(IMPORT_QUEUE_NAME, { noAck: false });
@@ -58,10 +93,19 @@ describe('Imports RabbitMQ integration (e2e)', () => {
             }
 
             queueChannel.ack(message);
-            events.push(JSON.parse(message.content.toString('utf8')) as Record<string, unknown>);
+            events.push(parseQueueEvent(message.content.toString('utf8')));
         }
 
         return events;
+    }
+
+    function buildCsvWithRows(rowsCount: number): string {
+        const rows: string[] = [];
+        for (let i = 0; i < rowsCount; i += 1) {
+            const vin = `VIN${String(i).padStart(14, '0')}`;
+            rows.push(`${vin},BMW,X5,2020,10000,D1,available`);
+        }
+        return `${HEADER}\n${rows.join('\n')}\n`;
     }
 
     beforeAll(async () => {
@@ -101,28 +145,39 @@ describe('Imports RabbitMQ integration (e2e)', () => {
 
         const response = await request(app.getHttpServer())
             .post('/api/imports')
-            .attach(
-                'file',
-                Buffer.from(
-                    'vin,make,model,year,mileage,dealershipId,status\n' +
-                        'VIN12345678901234,BMW,X5,2020,10000,D1,available\n' +
-                        'VIN12345678901235,Audi,A4,2021,5000,D2,sold\n',
-                ),
-                {
-                    filename: 'cars.csv',
-                    contentType: 'text/csv',
-                },
-            )
+            .attach('file', Buffer.from(buildCsvWithRows(2001)), {
+                filename: 'cars.csv',
+                contentType: 'text/csv',
+            })
             .expect(201);
 
-        const jobId = (response.body as { jobId: string }).jobId;
+        if (!isRecord(response.body) || typeof response.body.jobId !== 'string') {
+            throw new Error('Response does not contain valid jobId');
+        }
+        const jobId = response.body.jobId;
         const events = await collectQueueMessages(1200);
+        const chunkEvents = events.filter(
+            (event): event is ImportChunkEvent => event.type === 'import.chunk',
+        );
+        let streamEnd: ImportStreamEndEvent | undefined;
+        for (const event of events) {
+            if (event.type === 'import.stream.end') {
+                streamEnd = event;
+                break;
+            }
+        }
 
-        expect(events.length).toBeGreaterThanOrEqual(3);
+        expect(events.length).toBeGreaterThanOrEqual(5);
         expect(events[0].type).toBe('import.job.start');
-        expect(events[1].type).toBe('import.chunk');
         expect(events[events.length - 1].type).toBe('import.stream.end');
         expect(events.some((event) => event.jobId === jobId)).toBe(true);
+        expect(chunkEvents).toHaveLength(3);
+        expect(chunkEvents.map((event) => event.chunkIndex)).toEqual([0, 1, 2]);
+        expect(chunkEvents[0].rowsCount).toBe(1000);
+        expect(chunkEvents[1].rowsCount).toBe(1000);
+        expect(chunkEvents[2].rowsCount).toBe(1);
+        expect(streamEnd?.totalChunks).toBe(3);
+        expect(streamEnd?.totalRows).toBe(2001);
     });
 
     it('помечает import как failed, если публикация в RabbitMQ недоступна', async () => {

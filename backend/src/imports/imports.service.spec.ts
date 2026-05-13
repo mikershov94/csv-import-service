@@ -127,7 +127,7 @@ describe('ImportsService', () => {
         });
         expect(importQueuePublisher.publishJobStart.mock.calls).toHaveLength(1);
         expect(importQueuePublisher.publishChunk.mock.calls).toHaveLength(1);
-        expect(importQueuePublisher.publishStreamEnd.mock.calls).toEqual([[createdDoc.id, 1]]);
+        expect(importQueuePublisher.publishStreamEnd.mock.calls).toEqual([[createdDoc.id, 1, 2]]);
     });
 
     it('возвращает стартовое SSE-событие прогресса для job', async () => {

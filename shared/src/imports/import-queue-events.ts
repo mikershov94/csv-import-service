@@ -20,6 +20,7 @@ export interface ImportChunkEvent {
     jobId: string;
     chunkIndex: number;
     isLast: boolean;
+    rowsCount: number;
     rows: string[];
 }
 
@@ -28,6 +29,7 @@ export interface ImportStreamEndEvent {
     type: typeof IMPORT_QUEUE_EVENTS.STREAM_END;
     jobId: string;
     totalChunks: number;
+    totalRows: number;
 }
 
 export type ImportQueueEvent = ImportJobStartEvent | ImportChunkEvent | ImportStreamEndEvent;

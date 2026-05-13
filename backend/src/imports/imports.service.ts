@@ -1,8 +1,12 @@
+import { createInterface } from 'node:readline';
+import { Readable } from 'node:stream';
+
 import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Observable, of } from 'rxjs';
 
+import { resolveImportChunkSize } from './consts/import-queue.consts';
 import { CreateImportResponseDto } from './dto/create-import-response.dto';
 import { GetImportsQueryDto } from './dto/get-imports-query.dto';
 import { ImportDetailsDto } from './dto/import-details.dto';
@@ -34,7 +38,7 @@ export class ImportsService {
         });
 
         try {
-            await this.publishFileAsChunks(createdImport.id, file);
+            await this.publishImportFile(createdImport.id, file);
         } catch (error) {
             await this.markImportFailed(createdImport.id, error);
             throw error;
@@ -87,32 +91,46 @@ export class ImportsService {
         return { items: foundImports.map((item) => mapImportToListItemDto(item)) };
     }
 
-    private async publishFileAsChunks(jobId: string, file: Express.Multer.File): Promise<void> {
-        const csvContent = file.buffer.toString('utf8');
-        const lines = csvContent
-            .split(/\r?\n/u)
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
-
-        const dataRows = lines.slice(1);
-        const chunkSize = 1000;
-
+    private async publishImportFile(jobId: string, file: Express.Multer.File): Promise<void> {
+        const chunkSize = resolveImportChunkSize();
         await this.importQueuePublisher.publishJobStart(jobId, file.originalname, file.size);
+        const source = Readable.from(file.buffer);
+        const lineReader = createInterface({ input: source, crlfDelay: Infinity });
 
-        if (dataRows.length === 0) {
-            await this.importQueuePublisher.publishStreamEnd(jobId, 0);
-            return;
+        let isHeaderSkipped = false;
+        let chunkIndex = 0;
+        let totalRows = 0;
+        let pendingRows: string[] = [];
+
+        for await (const rawLine of lineReader) {
+            const line = rawLine.trim();
+            if (line.length === 0) {
+                continue;
+            }
+
+            if (!isHeaderSkipped) {
+                isHeaderSkipped = true;
+                continue;
+            }
+
+            pendingRows.push(line);
+            totalRows += 1;
+
+            if (pendingRows.length < chunkSize) {
+                continue;
+            }
+
+            await this.importQueuePublisher.publishChunk(jobId, chunkIndex, false, pendingRows);
+            chunkIndex += 1;
+            pendingRows = [];
         }
 
-        let chunkIndex = 0;
-        for (let i = 0; i < dataRows.length; i += chunkSize) {
-            const rows = dataRows.slice(i, i + chunkSize);
-            const isLast = i + chunkSize >= dataRows.length;
-            await this.importQueuePublisher.publishChunk(jobId, chunkIndex, isLast, rows);
+        if (pendingRows.length > 0) {
+            await this.importQueuePublisher.publishChunk(jobId, chunkIndex, true, pendingRows);
             chunkIndex += 1;
         }
 
-        await this.importQueuePublisher.publishStreamEnd(jobId, chunkIndex);
+        await this.importQueuePublisher.publishStreamEnd(jobId, chunkIndex, totalRows);
     }
 
     private async markImportFailed(jobId: string, error: unknown): Promise<void> {
