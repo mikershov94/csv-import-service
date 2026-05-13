@@ -13,7 +13,12 @@ import { Channel, ChannelModel, connect, ConsumeMessage } from 'amqplib';
 import { CarsService } from '../../cars/cars.service';
 import { CarUpsertInput } from '../../cars/interfaces/cars.interfaces';
 import { ImportsService } from '../imports.service';
-import { IMPORT_QUEUE_NAME, resolveQueueConsumerPrefetch } from './import-queue-consumer.consts';
+import {
+    IMPORT_QUEUE_NAME,
+    resolveQueueConnectRetries,
+    resolveQueueConnectRetryDelayMs,
+    resolveQueueConsumerPrefetch,
+} from './import-queue-consumer.consts';
 import {
     extractJobIdFromPayload,
     InvalidQueueEventPayloadError,
@@ -41,7 +46,10 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
             return;
         }
 
-        this.connection = await connect(rabbitUrl);
+        const retries = resolveQueueConnectRetries();
+        const retryDelayMs = resolveQueueConnectRetryDelayMs();
+
+        this.connection = await this.connectWithRetry(rabbitUrl, retries, retryDelayMs);
         this.channel = await this.connection.createChannel();
         await this.channel.assertQueue(IMPORT_QUEUE_NAME, { durable: true });
         await this.channel.prefetch(resolveQueueConsumerPrefetch());
@@ -55,6 +63,35 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
         );
         this.consumerTag = result.consumerTag;
         this.logger.log(`Consumer подключен к очереди ${IMPORT_QUEUE_NAME}`);
+    }
+
+    private async connectWithRetry(
+        rabbitUrl: string,
+        retries: number,
+        retryDelayMs: number,
+    ): Promise<ChannelModel> {
+        let lastError: unknown;
+
+        for (let attempt = 1; attempt <= retries; attempt += 1) {
+            try {
+                return await connect(rabbitUrl);
+            } catch (error) {
+                lastError = error;
+                const message = error instanceof Error ? error.message : 'unknown error';
+                this.logger.warn(
+                    `Не удалось подключиться к RabbitMQ (попытка ${attempt}/${retries}): ${message}`,
+                );
+                if (attempt < retries) {
+                    await this.delay(retryDelayMs);
+                }
+            }
+        }
+
+        throw lastError instanceof Error ? lastError : new Error('Ошибка подключения к RabbitMQ');
+    }
+
+    private async delay(ms: number): Promise<void> {
+        await new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     async onModuleDestroy(): Promise<void> {
@@ -178,8 +215,26 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
     }
 
     private async handleStreamEnd(event: ImportStreamEndEvent): Promise<void> {
+        await this.waitForProcessingCatchUp(event.jobId, event.totalRows);
         const hasErrors = await this.importsService.hasErrors(event.jobId);
         await this.importsService.markCompleted(event.jobId, hasErrors);
+    }
+
+    private async waitForProcessingCatchUp(jobId: string, totalRows: number): Promise<void> {
+        const maxAttempts = 40;
+        const delayMs = 100;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            const processedRows = await this.importsService.getProcessedRows(jobId);
+            if (processedRows >= totalRows) {
+                return;
+            }
+            await this.delay(delayMs);
+        }
+
+        this.logger.warn(
+            `stream_end для ${jobId}: processedRows не достиг totalRows=${totalRows} в отведённое время`,
+        );
     }
 
     private isRetryableError(error: unknown): boolean {

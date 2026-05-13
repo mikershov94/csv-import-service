@@ -50,6 +50,7 @@ describe('ImportQueueConsumer', () => {
     beforeEach(() => {
         importsService = {
             applyProgress: jest.fn(),
+            getProcessedRows: jest.fn().mockResolvedValue(5),
             hasErrors: jest.fn(),
             markCompleted: jest.fn(),
             markFailed: jest.fn(),

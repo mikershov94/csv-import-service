@@ -1,0 +1,5 @@
+{
+  "testEnvironment": "node",
+  "testMatch": ["**/test/pipeline.e2e.spec.js"],
+  "maxWorkers": 1
+}

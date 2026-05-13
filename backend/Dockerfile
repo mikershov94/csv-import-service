@@ -18,4 +18,4 @@ COPY backend/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/backend/dist ./dist
 EXPOSE 8000
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/backend/src/main.js"]

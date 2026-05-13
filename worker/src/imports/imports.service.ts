@@ -84,6 +84,16 @@ export class ImportsService {
         return failedRows > 0 || errorsCount > 0;
     }
 
+    async getProcessedRows(jobId: string): Promise<number> {
+        const importEntity = await this.importModel
+            .findById(jobId)
+            .select({ processedRows: 1 })
+            .lean()
+            .exec();
+
+        return importEntity?.processedRows ?? 0;
+    }
+
     async markFailed(jobId: string, message: string, code = 'WORKER_ERROR'): Promise<void> {
         const importEntity = await this.importModel.findById(jobId).exec();
         if (!importEntity) {
