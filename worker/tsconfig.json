@@ -11,13 +11,16 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
-    "baseUrl": ".",
+    "rootDir": "..",
     "paths": {
       "@shared": ["../shared/src/index.ts"],
-      "@shared/*": ["../shared/src/*"]
+      "@shared/*": ["../shared/src/*"],
+      "@shared/imports": ["../shared/src/imports/index.ts"],
+      "@shared/imports/*": ["../shared/src/imports/*"]
     },
     "sourceMap": true,
     "outDir": "./dist",
+    "noEmit": true,
     "types": ["node", "jest"],
     "incremental": true,
     "skipLibCheck": true,
