@@ -1,1 +1,5 @@
-export type { ImportErrorSummaryItem } from "@repo-shared/imports/import-error-summary-item.interface";
+export type ImportErrorSummaryItem = {
+  code: string;
+  message: string;
+  count: number;
+};

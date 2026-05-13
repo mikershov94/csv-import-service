@@ -14,7 +14,7 @@ export async function createImport(file: File): Promise<CreateImportResult> {
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || "Failed to create import");
+    throw new Error(message || "Не удалось создать задачу импорта");
   }
 
   const dto = (await response.json()) as CreateImportResponseDto;

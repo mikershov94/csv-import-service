@@ -1,1 +1,7 @@
-export { ImportStatus } from "@repo-shared/imports/import-status.enum";
+export enum ImportStatus {
+  QUEUED = "queued",
+  PROCESSING = "processing",
+  COMPLETED = "completed",
+  COMPLETED_WITH_ERRORS = "completed_with_errors",
+  FAILED = "failed",
+}

@@ -12,7 +12,7 @@ export async function getRecentImports(limit = 20): Promise<RecentImports> {
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || "Failed to fetch recent imports");
+    throw new Error(message || "Не удалось получить список последних импортов");
   }
 
   const dto = (await response.json()) as RecentImportsDto;

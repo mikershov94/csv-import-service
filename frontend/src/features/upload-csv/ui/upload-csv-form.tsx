@@ -14,7 +14,7 @@ type UploadCsvFormProps = {
 
 export const UploadCsvForm = ({
     onImportCreated,
-    startButtonLabel = 'Start import',
+    startButtonLabel = 'Начать импорт',
 }: UploadCsvFormProps) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export const UploadCsvForm = ({
             const message =
                 requestError instanceof Error
                     ? requestError.message
-                    : 'Failed to start import';
+                    : 'Не удалось запустить импорт';
             setError(message);
         } finally {
             setIsSubmitting(false);
@@ -63,7 +63,7 @@ export const UploadCsvForm = ({
             />
             {selectedFile ? (
                 <p className="text-sm text-slate-800">
-                    Selected: {selectedFile.name} ({formatBytes(selectedFile.size)})
+                    Выбран файл: {selectedFile.name} ({formatBytes(selectedFile.size)})
                 </p>
             ) : null}
             <Button
@@ -71,7 +71,7 @@ export const UploadCsvForm = ({
                 disabled={!selectedFile || isSubmitting}
                 onClick={handleStartImport}
             >
-                {isSubmitting ? 'Starting...' : startButtonLabel}
+                {isSubmitting ? 'Запуск...' : startButtonLabel}
             </Button>
         </div>
     );

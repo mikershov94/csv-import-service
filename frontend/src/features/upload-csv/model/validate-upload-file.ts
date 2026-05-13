@@ -18,11 +18,11 @@ export function formatBytes(bytes: number): string {
 
 export function validateUploadFile(file: File): string | null {
     if (!hasCsvExtension(file.name)) {
-        return 'File must have .csv extension';
+        return 'Файл должен иметь расширение .csv';
     }
 
     if (file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
-        return `File is too large. Max size is ${formatBytes(MAX_IMPORT_FILE_SIZE_BYTES)}`;
+        return `Файл слишком большой. Максимальный размер: ${formatBytes(MAX_IMPORT_FILE_SIZE_BYTES)}`;
     }
 
     return null;

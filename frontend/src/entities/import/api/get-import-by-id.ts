@@ -12,7 +12,7 @@ export async function getImportById(jobId: string): Promise<ImportDetails> {
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Failed to fetch import ${jobId}`);
+    throw new Error(message || `Не удалось получить импорт ${jobId}`);
   }
 
   const dto = (await response.json()) as ImportDetailsDto;

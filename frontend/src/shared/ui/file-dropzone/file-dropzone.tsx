@@ -93,7 +93,7 @@ export const FileDropzone = ({
             onDrop={handleDrop}
             className={`flex min-h-32 flex-col items-start justify-center gap-3 rounded-xl border-2 border-dashed p-4 transition-colors ${dropzoneStateClass} ${className ?? ''}`}
         >
-            <Label htmlFor={inputId}>Select CSV file</Label>
+            <Label htmlFor={inputId}>Выберите CSV-файл</Label>
             <FileInput
                 id={inputId}
                 disabled={disabled}
@@ -101,7 +101,7 @@ export const FileDropzone = ({
                 className="sr-only"
             />
             <Button type="button" variant="secondary" disabled={disabled}>
-                Browse
+                Обзор
             </Button>
             {errorText ? <p className="text-sm text-red-700">{errorText}</p> : null}
         </div>

@@ -15,8 +15,8 @@ export const ImportProgressWidget = ({ progress, details }: ImportProgressWidget
     <Panel className="min-h-44 bg-amber-300" contentClassName="py-6">
       <Progress value={progressValue} label={progress?.status ?? "queued"} />
       <p className="mt-3 text-sm text-slate-800">
-        bytes: {progress?.processedBytes ?? 0} | valid: {progress?.validRows ?? 0} | invalid:{" "}
-        {progress?.invalidRows ?? 0}
+        байты: {progress?.processedBytes ?? 0} | валидные: {progress?.validRows ?? 0} |
+        невалидные: {progress?.invalidRows ?? 0}
       </p>
     </Panel>
   );

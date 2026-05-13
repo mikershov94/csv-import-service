@@ -54,9 +54,10 @@ export class ImportsService {
     streamImportEvents(jobId: string): Observable<MessageEvent> {
         return timer(0, ImportsService.IMPORT_PROGRESS_POLL_INTERVAL_MS).pipe(
             switchMap(async () => this.importModel.findById(jobId).lean().exec()),
-            map((importEntity) => this.mapImportToProgressEvent(jobId, importEntity)),
-            distinctUntilChanged((previous, next) => this.isSameProgress(previous.data, next.data)),
-            takeWhile((event) => !this.isFinalImportStatus(event.data.status), true),
+            map((importEntity) => this.mapImportToProgressData(jobId, importEntity)),
+            distinctUntilChanged((previous, next) => this.isSameProgress(previous, next)),
+            takeWhile((event) => !this.isFinalImportStatus(event.status), true),
+            map((data) => ({ type: 'progress', data })),
         );
     }
 
@@ -149,7 +150,7 @@ export class ImportsService {
             .exec();
     }
 
-    private mapImportToProgressEvent(
+    private mapImportToProgressData(
         jobId: string,
         importEntity: {
             status?: ImportStatus;
@@ -159,7 +160,7 @@ export class ImportsService {
             totalRows?: number;
             fileSizeBytes?: number;
         } | null,
-    ): MessageEvent {
+    ): ImportProgressEventDto {
         const status = importEntity?.status ?? ImportStatus.QUEUED;
         const validRows = importEntity?.successRows ?? 0;
         const invalidRows = importEntity?.failedRows ?? 0;
@@ -167,17 +168,17 @@ export class ImportsService {
         const totalRows = importEntity?.totalRows ?? 0;
         const fileSizeBytes = importEntity?.fileSizeBytes ?? 0;
         const processedBytes =
-            totalRows > 0 ? Math.min(fileSizeBytes, Math.floor((processedRows / totalRows) * fileSizeBytes)) : 0;
+            totalRows > 0
+                ? Math.min(fileSizeBytes, Math.floor((processedRows / totalRows) * fileSizeBytes))
+                : 0;
 
-        const data: ImportProgressEventDto = {
+        return {
             jobId,
             status,
             processedBytes,
             validRows,
             invalidRows,
         };
-
-        return { type: 'progress', data };
     }
 
     private isFinalImportStatus(status: ImportStatus): boolean {
@@ -188,7 +189,10 @@ export class ImportsService {
         );
     }
 
-    private isSameProgress(previous: ImportProgressEventDto, next: ImportProgressEventDto): boolean {
+    private isSameProgress(
+        previous: ImportProgressEventDto,
+        next: ImportProgressEventDto,
+    ): boolean {
         return (
             previous.jobId === next.jobId &&
             previous.status === next.status &&
