@@ -215,6 +215,7 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
     }
 
     private async handleStreamEnd(event: ImportStreamEndEvent): Promise<void> {
+        await this.importsService.setTotalRows(event.jobId, event.totalRows);
         await this.waitForProcessingCatchUp(event.jobId, event.totalRows);
         const hasErrors = await this.importsService.hasErrors(event.jobId);
         await this.importsService.markCompleted(event.jobId, hasErrors);

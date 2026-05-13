@@ -67,6 +67,19 @@ export class ImportsService {
         return { status, finishedAt };
     }
 
+    async setTotalRows(jobId: string, totalRows: number): Promise<void> {
+        await this.importModel
+            .updateOne(
+                { _id: jobId },
+                {
+                    $set: {
+                        totalRows,
+                    },
+                },
+            )
+            .exec();
+    }
+
     async hasErrors(jobId: string): Promise<boolean> {
         const importEntity = await this.importModel
             .findById(jobId)
