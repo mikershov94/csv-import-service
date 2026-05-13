@@ -4,8 +4,8 @@ import { ImportListItemDto } from '../dto/import-list-item.dto';
 import { ImportDocument } from '../entities/import.entity';
 
 function getCreatedAt(importEntity: ImportDocument): Date {
-    const createdAt = importEntity.get('createdAt') as Date | undefined;
-    return createdAt ?? new Date();
+    const createdAt = importEntity.get('createdAt') as unknown;
+    return createdAt instanceof Date ? createdAt : new Date();
 }
 
 function mapImportToErrorSummaryItemDto(errorItem: {

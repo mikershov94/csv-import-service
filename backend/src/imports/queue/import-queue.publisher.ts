@@ -1,12 +1,12 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ChannelModel, ConfirmChannel, connect } from 'amqplib';
 
-import { QueuePublishError } from './import-queue.errors';
 import {
     IMPORT_QUEUE_NAME,
     resolveQueuePublishRetries,
     resolveQueuePublishTimeoutMs,
 } from './consts/import-queue.publisher.consts';
+import { QueuePublishError } from './import-queue.errors';
 import {
     buildImportChunkEvent,
     buildImportJobStartEvent,

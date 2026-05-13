@@ -1,8 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { ImportErrorSummaryItem as SharedImportErrorSummaryItem, ImportStatus } from '@shared';
 import { HydratedDocument } from 'mongoose';
-
-import { ImportErrorSummaryItem as SharedImportErrorSummaryItem } from '../../../../shared/src/imports/import-error-summary-item.interface';
-import { ImportStatus } from '../../../../shared/src/imports/import-status.enum';
 
 export { ImportStatus };
 

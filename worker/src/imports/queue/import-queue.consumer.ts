@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
+    assertNever,
     IMPORT_QUEUE_EVENTS,
     ImportChunkEvent,
     ImportJobStartEvent,
@@ -10,7 +11,7 @@ import { Channel, ChannelModel, connect, ConsumeMessage } from 'amqplib';
 
 import { ImportsService } from '../imports.service';
 import { IMPORT_QUEUE_NAME, resolveQueueConsumerPrefetch } from './import-queue-consumer.consts';
-import { isImportQueueEvent } from './typeguards/is-import-queue-event.guard';
+import { parseImportQueueEvent } from './typeguards';
 
 @Injectable()
 export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
@@ -70,11 +71,7 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
     }
 
     private parseEvent(rawPayload: string): ImportQueueEvent {
-        const payload: unknown = JSON.parse(rawPayload);
-        if (!isImportQueueEvent(payload)) {
-            throw new Error('Некорректный payload события очереди');
-        }
-        return payload;
+        return parseImportQueueEvent(rawPayload);
     }
 
     private async processEvent(event: ImportQueueEvent): Promise<void> {
@@ -89,7 +86,7 @@ export class ImportQueueConsumer implements OnModuleInit, OnModuleDestroy {
                 await this.handleStreamEnd(event);
                 return;
             default:
-                throw new Error(`Неизвестный тип события: ${(event as { type: string }).type}`);
+                assertNever(event);
         }
     }
 
