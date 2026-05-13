@@ -15,7 +15,7 @@ const TEST_MONGO_URI =
     'mongodb://admin:Asdqwe123%21@localhost:27017/csv_import_service?authSource=admin';
 const TEST_RABBIT_URI = process.env.TEST_RABBITMQ_URL ?? 'amqp://admin:Asdqwe123%21@localhost:5672';
 const IMPORT_QUEUE_NAME = 'imports.queue';
-const E2E_TIMEOUT_MS = 30_000;
+const E2E_TIMEOUT_MS = 60_000;
 
 describe('ImportQueueConsumer (e2e)', () => {
     jest.setTimeout(E2E_TIMEOUT_MS);
@@ -132,7 +132,7 @@ describe('ImportQueueConsumer (e2e)', () => {
 
         await waitForImportState(
             createdImport.id,
-            10_000,
+            20_000,
             (importDoc) => importDoc?.status === ImportStatus.PROCESSING,
         );
     });
@@ -171,7 +171,7 @@ describe('ImportQueueConsumer (e2e)', () => {
 
         const importDoc = await waitForImportState(
             createdImport.id,
-            10_000,
+            20_000,
             (doc) => doc?.status === ImportStatus.COMPLETED,
         );
 
@@ -216,7 +216,7 @@ describe('ImportQueueConsumer (e2e)', () => {
 
         const importDoc = await waitForImportState(
             createdImport.id,
-            10_000,
+            20_000,
             (doc) => doc?.status === ImportStatus.COMPLETED_WITH_ERRORS,
         );
 
@@ -277,7 +277,7 @@ describe('ImportQueueConsumer (e2e)', () => {
 
         await waitForImportState(
             secondImport.id,
-            10_000,
+            20_000,
             (doc) =>
                 doc?.status === ImportStatus.COMPLETED ||
                 doc?.status === ImportStatus.COMPLETED_WITH_ERRORS,
@@ -304,7 +304,7 @@ describe('ImportQueueConsumer (e2e)', () => {
 
         const importDoc = await waitForImportState(
             createdImport.id,
-            10_000,
+            20_000,
             (doc) => doc?.status === ImportStatus.FAILED,
         );
 

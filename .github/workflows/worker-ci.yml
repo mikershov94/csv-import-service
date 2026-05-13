@@ -92,12 +92,25 @@ jobs:
       - name: Wait for MongoDB and RabbitMQ
         working-directory: .
         run: |
+          set -e
           for i in {1..30}; do
-            (echo > /dev/tcp/localhost/27017) >/dev/null 2>&1 && break
+            if (echo > /dev/tcp/localhost/27017) >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "MongoDB is not ready"
+              exit 1
+            fi
             sleep 1
           done
           for i in {1..30}; do
-            (echo > /dev/tcp/localhost/5672) >/dev/null 2>&1 && break
+            if (echo > /dev/tcp/localhost/5672) >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "RabbitMQ is not ready"
+              exit 1
+            fi
             sleep 1
           done
 
@@ -105,7 +118,7 @@ jobs:
         env:
           TEST_MONGODB_URI: mongodb://admin:Asdqwe123%21@localhost:27017/csv_import_service?authSource=admin
           TEST_RABBITMQ_URL: amqp://admin:Asdqwe123%21@localhost:5672
-        run: npm run test:e2e
+        run: npm run test:e2e -- --runInBand
 
   build:
     name: Build
