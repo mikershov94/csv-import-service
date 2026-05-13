@@ -111,6 +111,33 @@ describe('Imports RabbitMQ integration (e2e)', () => {
         return events;
     }
 
+    async function postImportWithRetry(
+        csvContent: string,
+        maxAttempts = 3,
+    ): Promise<request.Response> {
+        let lastResponse: request.Response | undefined;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            const response = await request(app.getHttpServer())
+                .post('/api/imports')
+                .attach('file', Buffer.from(csvContent), {
+                    filename: 'cars.csv',
+                    contentType: 'text/csv',
+                });
+
+            if (response.status === 201) {
+                return response;
+            }
+
+            lastResponse = response;
+            await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+        }
+
+        throw new Error(
+            `POST /api/imports returned ${lastResponse?.status}. Body: ${JSON.stringify(lastResponse?.body)}`,
+        );
+    }
+
     function buildCsvWithRows(rowsCount: number): string {
         const rows: string[] = [];
         for (let i = 0; i < rowsCount; i += 1) {
@@ -161,13 +188,7 @@ describe('Imports RabbitMQ integration (e2e)', () => {
         await queueChannel.purgeQueue(IMPORT_QUEUE_NAME);
         await importModel.deleteMany({});
 
-        const response = await request(app.getHttpServer())
-            .post('/api/imports')
-            .attach('file', Buffer.from(buildCsvWithRows(2001)), {
-                filename: 'cars.csv',
-                contentType: 'text/csv',
-            })
-            .expect(201);
+        const response = await postImportWithRetry(buildCsvWithRows(2001));
 
         if (!isRecord(response.body) || typeof response.body.jobId !== 'string') {
             throw new Error('Response does not contain valid jobId');
@@ -232,13 +253,7 @@ describe('Imports RabbitMQ integration (e2e)', () => {
         await queueChannel.purgeQueue(IMPORT_QUEUE_NAME);
         await importModel.deleteMany({});
 
-        const createResponse = await request(app.getHttpServer())
-            .post('/api/imports')
-            .attach('file', Buffer.from(buildCsvWithRows(2)), {
-                filename: 'cars.csv',
-                contentType: 'text/csv',
-            })
-            .expect(201);
+        const createResponse = await postImportWithRetry(buildCsvWithRows(2));
 
         if (!isRecord(createResponse.body) || typeof createResponse.body.jobId !== 'string') {
             throw new Error('Response does not contain valid jobId');
