@@ -1,5 +1,5 @@
-import { ImportsPageClient } from "./imports-page.client";
+import { ImportsDashboardClient } from "@/features/imports-dashboard";
 
 export default function Home() {
-  return <ImportsPageClient />;
+  return <ImportsDashboardClient />;
 }

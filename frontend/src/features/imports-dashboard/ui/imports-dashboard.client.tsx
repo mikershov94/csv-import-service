@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 
 import {
   getImportById,
+  getRecentImports,
   ImportDetails,
   ImportProgress,
   ImportStatus,
   isFinalImportStatus,
+  RecentImports,
   streamImportEvents,
 } from "@/entities/import";
 import { PageContainer } from "@/shared/ui";
@@ -16,10 +18,20 @@ import { ImportProgressWidget } from "@/widgets/import-progress/ui/import-progre
 import { ImportSummaryWidget } from "@/widgets/import-summary/ui/import-summary-widget";
 import { UploadZoneWidget } from "@/widgets/upload-zone/ui/upload-zone-widget";
 
-export const ImportsPageClient = () => {
+export const ImportsDashboardClient = () => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [details, setDetails] = useState<ImportDetails | null>(null);
+  const [history, setHistory] = useState<RecentImports>({ items: [] });
+
+  const refreshHistory = async () => {
+    try {
+      const next = await getRecentImports(20);
+      setHistory(next);
+    } catch {
+      setHistory((prev) => prev);
+    }
+  };
 
   const handleImportCreated = (jobId: string) => {
     setCurrentJobId(jobId);
@@ -31,7 +43,29 @@ export const ImportsPageClient = () => {
       invalidRows: 0,
     });
     setDetails(null);
+    void refreshHistory();
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadHistory = async () => {
+      try {
+        const next = await getRecentImports(20);
+        if (isMounted) {
+          setHistory(next);
+        }
+      } catch {
+        // no-op
+      }
+    };
+
+    void loadHistory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentJobId) {
@@ -59,11 +93,12 @@ export const ImportsPageClient = () => {
 
         if (isFinalImportStatus(nextDetails.status)) {
           clearInterval(interval);
+          void refreshHistory();
         }
       } catch {
-        // no-op: keep polling
+        // no-op: keep polling fallback
       }
-    }, 1500);
+    }, 1000);
 
     return () => {
       clearInterval(interval);
@@ -77,7 +112,7 @@ export const ImportsPageClient = () => {
         <UploadZoneWidget onImportCreated={handleImportCreated} />
         <ImportProgressWidget progress={progress} details={details} />
         <ImportSummaryWidget details={details} />
-        <ImportHistoryWidget />
+        <ImportHistoryWidget history={history} />
       </PageContainer>
     </div>
   );
