@@ -145,5 +145,5 @@ jobs:
         run: npm run build
 
       - name: Build Docker image
-        run: docker build -f worker/Dockerfile -t worker-ci:${{ github.sha }} worker
+        run: docker build -f worker/Dockerfile -t worker-ci:${{ github.sha }} .
         working-directory: .
