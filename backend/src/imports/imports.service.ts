@@ -1,6 +1,3 @@
-import { createInterface } from 'node:readline';
-import { Readable } from 'node:stream';
-
 import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -94,15 +91,15 @@ export class ImportsService {
     private async publishImportFile(jobId: string, file: Express.Multer.File): Promise<void> {
         const chunkSize = resolveImportChunkSize();
         await this.importQueuePublisher.publishJobStart(jobId, file.originalname, file.size);
-        const source = Readable.from([file.buffer]);
-        const lineReader = createInterface({ input: source, crlfDelay: Infinity });
+        const fileText = file.buffer.toString('utf8');
+        const lines = fileText.split(/\r?\n/u);
 
         let isHeaderSkipped = false;
         let chunkIndex = 0;
         let totalRows = 0;
         let pendingRows: string[] = [];
 
-        for await (const rawLine of lineReader) {
+        for (const rawLine of lines) {
             const line = rawLine.trim();
             if (line.length === 0) {
                 continue;
