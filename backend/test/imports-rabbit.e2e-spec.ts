@@ -50,6 +50,18 @@ describe('Imports RabbitMQ integration (e2e)', () => {
         return typeof value === 'object' && value !== null;
     }
 
+    function hasStringField(value: Record<string, unknown>, key: string): boolean {
+        return typeof value[key] === 'string';
+    }
+
+    function isImportsListBody(value: unknown): value is { items: Array<{ jobId: string }> } {
+        if (!isRecord(value) || !Array.isArray(value.items)) {
+            return false;
+        }
+
+        return value.items.every((item) => isRecord(item) && hasStringField(item, 'jobId'));
+    }
+
     function isImportQueueEvent(value: unknown): value is ImportQueueEvent {
         if (!isRecord(value) || typeof value.type !== 'string' || typeof value.jobId !== 'string') {
             return false;
@@ -208,5 +220,46 @@ describe('Imports RabbitMQ integration (e2e)', () => {
 
         expect(importDoc).not.toBeNull();
         expect(importDoc?.status).toBe(ImportStatus.FAILED);
+    });
+
+    it('POST /api/imports сохраняет import, GET /api/imports/:jobId и GET /api/imports возвращают данные', async () => {
+        if (!rabbitAvailable) {
+            throw new Error(
+                `RabbitMQ недоступен по ${TEST_RABBIT_URI}. Выполните: docker compose up -d mongodb rabbitmq`,
+            );
+        }
+        await bootstrap(TEST_RABBIT_URI);
+        await queueChannel.purgeQueue(IMPORT_QUEUE_NAME);
+        await importModel.deleteMany({});
+
+        const createResponse = await request(app.getHttpServer())
+            .post('/api/imports')
+            .attach('file', Buffer.from(buildCsvWithRows(2)), {
+                filename: 'cars.csv',
+                contentType: 'text/csv',
+            })
+            .expect(201);
+
+        if (!isRecord(createResponse.body) || typeof createResponse.body.jobId !== 'string') {
+            throw new Error('Response does not contain valid jobId');
+        }
+        const jobId = createResponse.body.jobId;
+
+        const detailsResponse = await request(app.getHttpServer())
+            .get(`/api/imports/${jobId}`)
+            .expect(200);
+        const detailsBody: unknown = detailsResponse.body;
+        if (!isRecord(detailsBody)) {
+            throw new Error('Details response body should be an object');
+        }
+        expect(hasStringField(detailsBody, 'jobId') && detailsBody.jobId).toBe(jobId);
+        expect(hasStringField(detailsBody, 'fileName') && detailsBody.fileName).toBe('cars.csv');
+
+        const listResponse = await request(app.getHttpServer()).get('/api/imports').expect(200);
+        const listBody: unknown = listResponse.body;
+        if (!isImportsListBody(listBody)) {
+            throw new Error('List response body should contain items with string jobId');
+        }
+        expect(listBody.items.some((item) => item.jobId === jobId)).toBe(true);
     });
 });
