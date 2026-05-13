@@ -1,6 +1,1 @@
-export enum CarStatus {
-    AVAILABLE = 'available',
-    SOLD = 'sold',
-    RESERVED = 'reserved',
-    SERVICE = 'service',
-}
+export { CarStatus } from '../../../../shared/src/cars/car-status.enum';

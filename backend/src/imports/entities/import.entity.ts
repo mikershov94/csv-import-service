@@ -1,13 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { ImportErrorSummaryItem as SharedImportErrorSummaryItem, ImportStatus } from '@shared';
 import { HydratedDocument } from 'mongoose';
 
-export enum ImportStatus {
-    QUEUED = 'queued',
-    PROCESSING = 'processing',
-    COMPLETED = 'completed',
-    COMPLETED_WITH_ERRORS = 'completed_with_errors',
-    FAILED = 'failed',
-}
+export { ImportStatus };
 
 @Schema({ _id: false })
 export class ImportErrorSummaryItem {
@@ -63,7 +58,7 @@ export class Import {
     updatedCount!: number;
 
     @Prop({ type: [ImportErrorSummaryItemSchema], default: [] })
-    errorSummary!: ImportErrorSummaryItem[];
+    errorSummary!: SharedImportErrorSummaryItem[];
 
     @Prop()
     startedAt?: Date;

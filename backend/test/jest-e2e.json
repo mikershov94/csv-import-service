@@ -2,7 +2,12 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "testEnvironment": "node",
+  "maxWorkers": 1,
   "testRegex": ".e2e-spec.ts$",
+  "moduleNameMapper": {
+    "^@shared$": "<rootDir>/../../shared/src/index.ts",
+    "^@shared/(.*)$": "<rootDir>/../../shared/src/$1"
+  },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }

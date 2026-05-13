@@ -10,6 +10,7 @@ import { ImportListItemDto } from './dto/import-list-item.dto';
 import { ImportDocument, ImportStatus } from './entities/import.entity';
 import { Import } from './entities/import.entity';
 import { ImportsService } from './imports.service';
+import { ImportQueuePublisher } from './queue/import-queue.publisher';
 
 describe('ImportsService', () => {
     let service: ImportsService;
@@ -18,7 +19,9 @@ describe('ImportsService', () => {
         exists: jest.Mock;
         findById: jest.Mock;
         find: jest.Mock;
+        updateOne: jest.Mock;
     };
+    let importQueuePublisher: jest.Mocked<ImportQueuePublisher>;
 
     function createImportDocument(overrides: Partial<ImportDocument> = {}): ImportDocument {
         const id = new Types.ObjectId().toString();
@@ -50,7 +53,14 @@ describe('ImportsService', () => {
             exists: jest.fn(),
             findById: jest.fn(),
             find: jest.fn(),
+            updateOne: jest.fn(),
         };
+        importQueuePublisher = {
+            publishJobStart: jest.fn(),
+            publishChunk: jest.fn(),
+            publishStreamEnd: jest.fn(),
+            onModuleDestroy: jest.fn(),
+        } as unknown as jest.Mocked<ImportQueuePublisher>;
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -58,6 +68,10 @@ describe('ImportsService', () => {
                 {
                     provide: getModelToken(Import.name),
                     useValue: importModel,
+                },
+                {
+                    provide: ImportQueuePublisher,
+                    useValue: importQueuePublisher,
                 },
             ],
         }).compile();
@@ -89,6 +103,7 @@ describe('ImportsService', () => {
         const file = {
             originalname: 'test.csv',
             size: 456,
+            buffer: Buffer.from('vin,make\nVIN12345678901234,BMW\nVIN12345678901235,Audi\n'),
         } as Express.Multer.File;
         const createdDoc = createImportDocument({
             id: new Types.ObjectId().toString(),
@@ -110,6 +125,9 @@ describe('ImportsService', () => {
             fileName: file.originalname,
             fileSizeBytes: file.size,
         });
+        expect(importQueuePublisher.publishJobStart.mock.calls).toHaveLength(1);
+        expect(importQueuePublisher.publishChunk.mock.calls).toHaveLength(1);
+        expect(importQueuePublisher.publishStreamEnd.mock.calls).toEqual([[createdDoc.id, 1, 2]]);
     });
 
     it('возвращает стартовое SSE-событие прогресса для job', async () => {
@@ -127,6 +145,26 @@ describe('ImportsService', () => {
                 invalidRows: 0,
             },
         });
+    });
+
+    it('помечает import как failed, если публикация в очередь завершилась ошибкой', async () => {
+        const file = {
+            originalname: 'test.csv',
+            size: 10,
+            buffer: Buffer.from('vin,make\nVIN12345678901234,BMW\n'),
+        } as Express.Multer.File;
+        const createdDoc = createImportDocument({
+            id: new Types.ObjectId().toString(),
+            fileName: file.originalname,
+            fileSizeBytes: file.size,
+        });
+        importModel.create.mockResolvedValue(createdDoc);
+        importQueuePublisher.publishJobStart.mockRejectedValue(new Error('publish failed'));
+        const exec = jest.fn().mockResolvedValue({ acknowledged: true });
+        importModel.updateOne.mockReturnValue({ exec });
+
+        await expect(service.createImportJob(file)).rejects.toThrow('publish failed');
+        expect(importModel.updateOne).toHaveBeenCalled();
     });
 
     it('возвращает детальную сводку по найденной задаче импорта', async () => {

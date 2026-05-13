@@ -11,8 +11,16 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
+    "rootDir": "..",
+    "paths": {
+      "@shared": ["../shared/src/index.ts"],
+      "@shared/*": ["../shared/src/*"],
+      "@shared/imports": ["../shared/src/imports/index.ts"],
+      "@shared/imports/*": ["../shared/src/imports/*"]
+    },
     "sourceMap": true,
     "outDir": "./dist",
+    "noEmit": true,
     "types": ["node", "jest", "multer"],
     "incremental": true,
     "skipLibCheck": true,
@@ -21,5 +29,6 @@
     "noImplicitAny": true,
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true
-  }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "../shared/src/**/*.ts"]
 }
